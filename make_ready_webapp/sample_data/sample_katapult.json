@@ -1,0 +1,189 @@
+{
+  "name": "Sample Katapult Project",
+  "job_owner": "techserv",
+  "job_creator": "techserv_CPS_ENERGY",
+  "nodes": {
+    "node-1": {
+      "_created": {
+        "method": "desktop",
+        "timestamp": 1746193395463,
+        "uid": "user123"
+      },
+      "attributes": {
+        "PoleNumber": {
+          "-Imported": "PL410620"
+        },
+        "pole_species": {
+          "assessment": "Southern Pine"
+        },
+        "pole_class": {
+          "assessment": "3"
+        },
+        "pole_owner": {
+          "multi_added": "CPS Energy"
+        },
+        "final_passing_capacity_%": {
+          "auto_calced": 65.2
+        },
+        "riser": {
+          "button_added": "YES"
+        }
+      },
+      "button": "aerial_path",
+      "latitude": 29.654321,
+      "longitude": -98.123456,
+      "photos": {
+        "photo-uuid-1": {
+          "association": true,
+          "association_type": "auto"
+        }
+      },
+      "numPhotos": 1,
+      "numAssociated": 1
+    },
+    "node-2": {
+      "_created": {
+        "method": "desktop",
+        "timestamp": 1746193395464,
+        "uid": "user123"
+      },
+      "attributes": {
+        "PoleNumber": {
+          "-Imported": "PL410621"
+        },
+        "pole_species": {
+          "assessment": "Southern Pine"
+        },
+        "pole_class": {
+          "assessment": "3"
+        },
+        "pole_owner": {
+          "multi_added": "CPS Energy"
+        },
+        "final_passing_capacity_%": {
+          "auto_calced": 45.5
+        }
+      },
+      "button": "aerial_path",
+      "latitude": 29.654322,
+      "longitude": -98.123457,
+      "photos": {},
+      "numPhotos": 0,
+      "numAssociated": 0
+    }
+  },
+  "photos": {
+    "photo-uuid-1": {
+      "name": "Pole PL410620 View",
+      "url_large": "sample_photo.jpg",
+      "date_taken": 1746193395463,
+      "photofirst_data": {
+        "wire": {
+          "wire-id-1": {
+            "_trace": "trace-fiber",
+            "_measured_height": "31' 2\"",
+            "mr_move": 0
+          },
+          "wire-id-2": {
+            "_trace": "trace-primary",
+            "_measured_height": "33' 6\"",
+            "mr_move": 0
+          },
+          "wire-id-3": {
+            "_trace": "trace-coax",
+            "_measured_height": "29' 6\"",
+            "mr_move": 12
+          }
+        },
+        "midspanHeight": {
+          "midspan-1": {
+            "_routine_instance_id": "wire-id-1",
+            "over": "Yard"
+          },
+          "midspan-2": {
+            "_routine_instance_id": "wire-id-2",
+            "over": "Roadway"
+          }
+        },
+        "equipment": {
+          "equip-id-1": {
+            "_trace": "trace-riser",
+            "_measured_height": "5' 0\""
+          }
+        }
+      }
+    }
+  },
+  "traces": {
+    "trace_data": {
+      "trace-fiber": {
+        "_trace_type": "cable",
+        "cable_type": "Fiber",
+        "company": "AT&T",
+        "label": "Fiber Cable",
+        "proposed": false
+      },
+      "trace-primary": {
+        "_trace_type": "cable",
+        "cable_type": "Primary",
+        "company": "CPS ENERGY",
+        "label": "Primary Line",
+        "proposed": false
+      },
+      "trace-coax": {
+        "_trace_type": "cable",
+        "cable_type": "Coax Cable",
+        "company": "Spectrum",
+        "label": "Coaxial Cable",
+        "proposed": false
+      },
+      "trace-riser": {
+        "_trace_type": "equipment",
+        "cable_type": null,
+        "company": "Spectrum",
+        "label": "Cable Riser",
+        "proposed": true
+      }
+    },
+    "trace_items": {
+      "photo-uuid-1": {
+        "trace-fiber": {},
+        "trace-primary": {},
+        "trace-coax": {},
+        "trace-riser": {}
+      }
+    }
+  },
+  "connections": {
+    "conn-1": {
+      "_created": {
+        "method": "desktop",
+        "timestamp": 1746193395463,
+        "uid": "user123"
+      },
+      "attributes": {
+        "connection_type": {
+          "button_added": "aerial"
+        }
+      },
+      "button": "aerial",
+      "node_id_1": "node-1",
+      "node_id_2": "node-2"
+    },
+    "conn-2": {
+      "_created": {
+        "method": "desktop",
+        "timestamp": 1746193395463,
+        "uid": "user123"
+      },
+      "attributes": {
+        "connection_type": {
+          "button_added": "down_guy"
+        }
+      },
+      "button": "down_guy",
+      "node_id_1": "node-1",
+      "node_id_2": "anchor-1"
+    }
+  }
+}
