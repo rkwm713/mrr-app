@@ -49,9 +49,12 @@ export class AttachmentAnalyzer {
       if (measuredAttachments.length > 0 && recommendedAttachments.length > 0) {
         // Check if any attachment heights changed
         for (const recAttachment of recommendedAttachments) {
-          const matchingMeasuredAttachment = measuredAttachments.find(mAttachment => 
-            mAttachment.id === recAttachment.id
-          );
+          // Safely compare attachment IDs by converting to string
+          const matchingMeasuredAttachment = measuredAttachments.find(mAttachment => {
+            const mId = String(mAttachment.id);
+            const rId = String(recAttachment.id);
+            return mId === rId;
+          });
           
           if (matchingMeasuredAttachment && 
               matchingMeasuredAttachment.attachmentHeight && 
@@ -146,9 +149,12 @@ static extractAttacherData(
       // If we have recommended attachments, try to find matching measured attachments
       if (recommendedAttachments.length > 0 && measuredAttachments.length > 0) {
         const primaryRecommendedAttachment = recommendedAttachments[0];
-        const matchingMeasuredAttachment = measuredAttachments.find(
-          mAttachment => mAttachment.id === primaryRecommendedAttachment.id
-        );
+        // Safely compare attachment IDs by converting to string
+        const matchingMeasuredAttachment = measuredAttachments.find(mAttachment => {
+          const mId = String(mAttachment.id);
+          const rId = String(primaryRecommendedAttachment.id);
+          return mId === rId;
+        });
         
         // Set existing heights if we found a matching attachment and not already set
         if (matchingMeasuredAttachment) {

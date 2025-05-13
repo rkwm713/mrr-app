@@ -286,13 +286,16 @@ export class SpidaDataExtractor {
       
       // Add Charter/Spectrum wires to attachments
       charterWires.forEach(wire => {
-        attachments.push({
-          id: wire.id,
-          attachmentHeight: wire.attachmentHeight,
-          midspanHeight: wire.midspanHeight,
-          description: this.getWireDescription(wire),
-          type: 'wire'
-        });
+        // Ensure wire.id exists, even if it's not a string
+        if (wire.id !== undefined) {
+          attachments.push({
+            id: wire.id, // Type will be converted to string when needed
+            attachmentHeight: wire.attachmentHeight,
+            midspanHeight: wire.midspanHeight,
+            description: this.getWireDescription(wire),
+            type: 'wire'
+          });
+        }
       });
     }
     
@@ -309,12 +312,15 @@ export class SpidaDataExtractor {
       
       // Add Charter/Spectrum equipment to attachments
       charterEquipment.forEach(equip => {
-        attachments.push({
-          id: equip.id,
-          attachmentHeight: equip.attachmentHeight,
-          description: this.getEquipmentDescription(equip),
-          type: 'equipment'
-        });
+        // Ensure equip.id exists, even if it's not a string
+        if (equip.id !== undefined) {
+          attachments.push({
+            id: equip.id, // Type will be converted to string when needed
+            attachmentHeight: equip.attachmentHeight,
+            description: this.getEquipmentDescription(equip),
+            type: 'equipment'
+          });
+        }
       });
     }
     
@@ -326,12 +332,25 @@ export class SpidaDataExtractor {
    */
   static getWireDescription(wire: SpidaStructureWire): string {
     // Try to get a meaningful description
-    const clientItem = getNestedValue<string>(wire, ['clientItem'], null);
-    if (clientItem && clientItem.includes('Fiber')) {
-      return 'Fiber Cable';
-    } else if (clientItem && clientItem.includes('Coax')) {
-      return 'Coaxial Cable';
-    } else if (wire.owner) {
+    const clientItem = getNestedValue<unknown>(wire, ['clientItem'], null);
+    
+    // Safely check if clientItem is a string and includes specific terms
+    if (clientItem !== null) {
+      const clientItemStr = typeof clientItem === 'string' 
+        ? clientItem 
+        : (typeof clientItem === 'object' && clientItem !== null)
+          ? JSON.stringify(clientItem)
+          : String(clientItem);
+          
+      if (clientItemStr.includes('Fiber')) {
+        return 'Fiber Cable';
+      } else if (clientItemStr.includes('Coax')) {
+        return 'Coaxial Cable';
+      }
+    }
+    
+    // If no specific description is found, use the owner
+    if (wire.owner) {
       // Convert owner to string safely
       let ownerStr: string;
       if (typeof wire.owner === 'string') {
