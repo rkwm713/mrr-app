@@ -1,0 +1,332 @@
+/* Global styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  background-color: #f4f7f9;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+header h1 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+}
+
+header p {
+  color: #7f8c8d;
+}
+
+main {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+}
+
+footer {
+  text-align: center;
+  margin-top: 30px;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+/* File upload styles */
+.upload-container {
+  border: 2px dashed #bdc3c7;
+  border-radius: 8px;
+  padding: 25px;
+  text-align: center;
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
+}
+
+.upload-container.drag-over {
+  border-color: #3498db;
+  background-color: rgba(52, 152, 219, 0.05);
+}
+
+.upload-container h2 {
+  margin-bottom: 15px;
+  color: #2c3e50;
+}
+
+.upload-container p {
+  margin-bottom: 20px;
+  color: #7f8c8d;
+}
+
+.file-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  margin-bottom: 20px;
+}
+
+.file-group {
+  flex: 1;
+  min-width: 300px;
+  margin: 10px;
+  text-align: left;
+}
+
+.file-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.file-group input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+}
+
+.file-status {
+  display: block;
+  margin-top: 5px;
+  font-size: 14px;
+}
+
+/* Processing status styles */
+.processing-status {
+  margin: 20px 0;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f8f9fa;
+}
+
+.progress-container {
+  width: 100%;
+  height: 20px;
+  background-color: #ecf0f1;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #2ecc71;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+/* Results container styles */
+.results-container {
+  margin-top: 30px;
+}
+
+.results-container h2 {
+  margin-bottom: 20px;
+  color: #2c3e50;
+}
+
+#resultsSummary {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+#resultsSummary p {
+  margin-bottom: 10px;
+}
+
+#resultsSummary ul {
+  margin-left: 20px;
+  margin-bottom: 15px;
+}
+
+.results-table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  table-layout: fixed;
+}
+
+.results-table th,
+.results-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid #ddd;
+  vertical-align: middle;
+  word-wrap: break-word;
+  font-size: 14px;
+}
+
+/* Header styles */
+.results-table th {
+  background-color: #f2f2f2;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Group headers for column grouping */
+.results-table th[colspan] {
+  background-color: #e8f4fd;
+  color: #2c3e50;
+  border-bottom: 2px solid #3498db;
+  font-weight: bold;
+}
+
+/* Make Ready Data column group */
+.results-table th[colspan="5"] {
+  background-color: #e5f9ec;
+  border-bottom: 2px solid #27ae60;
+}
+
+/* Mid span subgroup */
+.results-table th[colspan="2"] {
+  background-color: #f9f2e5;
+  border-bottom: 2px solid #f39c12;
+}
+
+/* Row styling */
+.results-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.results-table tr.full-match {
+  background-color: rgba(46, 204, 113, 0.1);
+}
+
+.results-table tr.partial-match {
+  background-color: rgba(241, 196, 15, 0.1);
+}
+
+/* Additional attacher rows (subsequent rows for the same pole) */
+.results-table tr.additional-attacher td {
+  background-color: #f8f9fa;
+  border-top: none;
+}
+
+/* Empty cells for multi-row presentation */
+.results-table tr.additional-attacher td[colspan="12"] {
+  background-color: #f8f9fa;
+  border-right: 2px solid #ddd;
+}
+
+/* First cell for the operation/pole identifier */
+.results-table tr.first-attacher td:first-child,
+.results-table tr.operation-group td:first-child {
+  font-weight: bold;
+  background-color: #f2f2f2;
+}
+
+/* Separator rows between poles */
+.results-table tr.separator-row {
+  height: 10px;
+}
+
+.results-table tr.separator-row td {
+  padding: 0;
+  border: none;
+  background-color: #f4f7f9;
+}
+
+/* Specific column highlighting */
+.results-table td:nth-child(5), /* Pole Structure */
+.results-table td:nth-child(8), /* PLA */
+.results-table td:nth-child(10), /* Height Lowest Com */
+.results-table td:nth-child(11), /* Height Lowest CPS Electrical */
+.results-table td:nth-child(13), /* Attacher Description */
+.results-table td:nth-child(14), /* Existing */
+.results-table td:nth-child(15) { /* Proposed */
+  font-weight: 500;
+}
+
+/* Color-code the reference rows */
+.results-table tr:has(td:contains("Reference or Other_pole")) {
+  background-color: #fbe5d6; /* Light orange */
+}
+
+/* Button styles */
+button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.generate-button {
+  background-color: #3498db;
+  color: white;
+  display: block;
+  margin: 20px auto;
+  min-width: 200px;
+}
+
+.generate-button:hover:not(:disabled) {
+  background-color: #2980b9;
+}
+
+#downloadBtn {
+  background-color: #27ae60;
+  color: white;
+  display: block;
+  margin: 20px auto;
+  min-width: 200px;
+}
+
+#downloadBtn:hover:not(:disabled) {
+  background-color: #219955;
+}
+
+.reset-button {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.reset-button:hover {
+  background-color: #c0392b;
+}
+
+.reset-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+  
+  main {
+    padding: 15px;
+  }
+  
+  .file-group {
+    min-width: 100%;
+  }
+}
