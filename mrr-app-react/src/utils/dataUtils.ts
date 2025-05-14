@@ -125,27 +125,55 @@ export function formatExcelValue(
 export function isCharterSpectrum(companyName: string | object | null | undefined): boolean {
   if (!companyName) return false;
   
-  let nameStr: string;
-  
-  if (typeof companyName === 'string') {
-    nameStr = companyName;
-  } else if (typeof companyName === 'object') {
-    // Try to convert object to string representation
+  // If it's a SpidaOwner object with industry and id fields, check those directly
+  if (typeof companyName === 'object' && companyName !== null) {
+    // Check if object has industry or id properties that might indicate Charter/Spectrum
+    const industry = getNestedValue<string>(companyName, ['industry'], '');
+    const id = getNestedValue<string>(companyName, ['id'], '');
+    
+    // Check if either field contains Charter/Spectrum identifiers
+    const charterAliases = ['charter', 'spectrum', 'charter/spectrum', 'charter communications'];
+    
+    if (industry) {
+      const industryLower = industry.toLowerCase();
+      if (charterAliases.some(alias => industryLower.includes(alias.toLowerCase()))) {
+        return true;
+      }
+    }
+    
+    if (id) {
+      const idLower = id.toLowerCase();
+      if (charterAliases.some(alias => idLower.includes(alias.toLowerCase()))) {
+        return true;
+      }
+    }
+    
+    // If specific field checks fail, try converting the whole object to string
     try {
-      nameStr = JSON.stringify(companyName);
+      const nameStr = JSON.stringify(companyName).toLowerCase();
+      return charterAliases.some(alias => nameStr.includes(alias.toLowerCase()));
     } catch {
       // If stringification fails, try toString or default to empty string
-      nameStr = companyName.toString ? companyName.toString() : '';
+      const nameStr = companyName.toString ? companyName.toString().toLowerCase() : '';
+      return charterAliases.some(alias => nameStr.includes(alias.toLowerCase()));
     }
-  } else {
-    // Try to convert to string for any other type
-    nameStr = String(companyName);
   }
   
-  const name = nameStr.toLowerCase();
-  const charterAliases = ['charter', 'spectrum', 'charter/spectrum', 'charter communications'];
+  // Handle string or other primitive types
+  if (typeof companyName === 'string') {
+    const nameLower = companyName.toLowerCase();
+    const charterAliases = ['charter', 'spectrum', 'charter/spectrum', 'charter communications'];
+    return charterAliases.some(alias => nameLower.includes(alias.toLowerCase()));
+  }
   
-  return charterAliases.some(alias => name.includes(alias.toLowerCase()));
+  // Last resort for other types
+  try {
+    const nameStr = String(companyName).toLowerCase();
+    const charterAliases = ['charter', 'spectrum', 'charter/spectrum', 'charter communications'];
+    return charterAliases.some(alias => nameStr.includes(alias.toLowerCase()));
+  } catch {
+    return false;
+  }
 }
 
 /**

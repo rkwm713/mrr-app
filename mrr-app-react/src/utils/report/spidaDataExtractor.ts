@@ -31,10 +31,22 @@ export class SpidaDataExtractor {
     katapultNode: Record<string, unknown> | null
   ): void {
     // Try to get from SPIDA first
-    const spidaPoleOwner = getNestedValue<string>(measuredDesign, ['structure', 'pole', 'owner'], null);
+    const spidaPoleOwner = getNestedValue<string | Record<string, unknown>>(
+      measuredDesign, 
+      ['structure', 'pole', 'owner'], 
+      null
+    );
     
     if (spidaPoleOwner) {
-      reportData.poleOwner = spidaPoleOwner;
+      // Check if owner is an object with industry and id fields (SpidaOwner)
+      if (typeof spidaPoleOwner === 'object' && spidaPoleOwner !== null) {
+        const industry = getNestedValue<string>(spidaPoleOwner, ['industry'], '');
+        const id = getNestedValue<string>(spidaPoleOwner, ['id'], '');
+        reportData.poleOwner = id || (industry ? `${industry} Owner` : 'Unknown Owner');
+      } else {
+        // If it's a string, use it directly
+        reportData.poleOwner = String(spidaPoleOwner);
+      }
       return;
     }
     
@@ -115,13 +127,25 @@ export class SpidaDataExtractor {
                          wire.usageGroup === 'COMMUNICATION_BUNDLE';
       
       // Check if this is an electrical wire owned by CPS Energy
+      let isCPSOwned = false;
+      
+      if (wire.owner) {
+        if (typeof wire.owner === 'string') {
+          isCPSOwned = wire.owner.includes('CPS');
+        } else if (typeof wire.owner === 'object' && wire.owner !== null) {
+          // Check if it's a SpidaOwner object with industry or id containing 'CPS'
+          const industry = getNestedValue<string>(wire.owner, ['industry'], '') || '';
+          const id = getNestedValue<string>(wire.owner, ['id'], '') || '';
+          
+          isCPSOwned = industry.includes('CPS') || id.includes('CPS');
+        }
+      }
+      
       const isElectricalWire = (wire.usageGroup === 'PRIMARY' || 
                                wire.usageGroup === 'SECONDARY' || 
                                wire.usageGroup === 'NEUTRAL' || 
                                wire.usageGroup === 'SERVICE') &&
-                               wire.owner && 
-                               typeof wire.owner === 'string' && 
-                               wire.owner.includes('CPS');
+                               isCPSOwned;
       
       // Update lowest heights if applicable
       if (isCommWire && (lowestCommHeight === null || heightInFeet < lowestCommHeight)) {
@@ -351,19 +375,28 @@ export class SpidaDataExtractor {
     
     // If no specific description is found, use the owner
     if (wire.owner) {
-      // Convert owner to string safely
-      let ownerStr: string;
-      if (typeof wire.owner === 'string') {
-        ownerStr = wire.owner;
-      } else {
-        // Use safe String() conversion for any other type
-        try {
-          ownerStr = String(wire.owner);
-        } catch {
-          ownerStr = 'Unknown';
+      // Handle SpidaOwner objects specifically
+      if (typeof wire.owner === 'object' && wire.owner !== null) {
+        const industry = getNestedValue<string>(wire.owner, ['industry'], '');
+        const id = getNestedValue<string>(wire.owner, ['id'], '');
+        if (id) {
+          return `${id} Cable`;
+        }
+        if (industry) {
+          return `${industry} Cable`;
         }
       }
-      return `${ownerStr} Cable`;
+      
+      // If it's a string or other type, convert to string
+      if (typeof wire.owner === 'string') {
+        return `${wire.owner} Cable`;
+      } else {
+        try {
+          return `${String(wire.owner)} Cable`;
+        } catch {
+          return 'Charter/Spectrum Cable';
+        }
+      }
     }
     
     return 'Charter/Spectrum Cable';
@@ -375,10 +408,15 @@ export class SpidaDataExtractor {
   static getEquipmentDescription(equipment: SpidaStructureEquipment): string {
     const equipmentType = getNestedValue<{ name?: string }>(equipment, ['type'], null);
     
-    // Convert owner to string safely
+    // Get appropriate owner string
     let ownerStr: string;
     if (equipment.owner) {
-      if (typeof equipment.owner === 'string') {
+      // Handle SpidaOwner objects specifically
+      if (typeof equipment.owner === 'object' && equipment.owner !== null) {
+        const industry = getNestedValue<string>(equipment.owner, ['industry'], '');
+        const id = getNestedValue<string>(equipment.owner, ['id'], '');
+        ownerStr = id || (industry ? `${industry} Owner` : 'Unknown Owner');
+      } else if (typeof equipment.owner === 'string') {
         ownerStr = equipment.owner;
       } else {
         // Use safe String() conversion for any other type
