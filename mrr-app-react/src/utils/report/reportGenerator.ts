@@ -9,8 +9,9 @@ import type {
 } from '../../types/DataTypes';
 import { ReportDataFactory } from './reportDataFactory';
 import { SpidaDataExtractor } from './spidaDataExtractor';
-import { KatapultDataExtractor } from './katapultDataExtractor';
 import { AttachmentAnalyzer } from './attachmentAnalyzer';
+import { MidspanDataAnalyzer } from './midspanDataAnalyzer';
+import { getNestedValue } from '../dataUtils';
 
 /**
  * Generates a report from correlated pole data
@@ -48,15 +49,14 @@ export function generateReport(
     operationNumber++;
   });
   
-  // Process Katapult-only poles (not found in SPIDA)
-  correlationResult.katapultOnlyPoles.forEach(katapultNode => {
-    // We can't get SPIDA-specific data like construction grade for these poles
-    const rowData = KatapultDataExtractor.extractKatapultOnlyPoleData(katapultNode, operationNumber);
-    rowData.matchStatus = 'Katapult Only';
-    
-    reportRows.push(rowData);
-    operationNumber++;
-  });
+  // Katapult-only poles are excluded from the report as requested
+  // Original code was:
+  // correlationResult.katapultOnlyPoles.forEach(katapultNode => {
+  //   const rowData = KatapultDataExtractor.extractKatapultOnlyPoleData(katapultNode, operationNumber);
+  //   rowData.matchStatus = 'Katapult Only';
+  //   reportRows.push(rowData);
+  //   operationNumber++;
+  // });
   
   return reportRows;
 }
@@ -92,10 +92,28 @@ function extractPoleData(
     SpidaDataExtractor.extractPoleOwner(reportData, measuredDesign, katapultNode);
     
     // Column E: Pole Structure (Species & Class)
-    SpidaDataExtractor.extractPoleStructure(reportData, measuredDesign, spidaData);
+    SpidaDataExtractor.extractPoleStructure(reportData, measuredDesign, spidaData, katapultNode);
     
     // Columns H-I: Midspan Heights (existing)
-    SpidaDataExtractor.extractMidspanHeights(reportData, measuredDesign);
+    // Use our enhanced midspan data analyzer for more accurate heights
+    if (katapultNode) {
+      // Extract midspan data from Katapult if available
+      const spanWires = MidspanDataAnalyzer.extractMidspanData(katapultNode);
+      
+      // Get lowest comm and electrical heights
+      const lowestComm = MidspanDataAnalyzer.getLowestMidspanHeight(spanWires, 'communication');
+      const lowestElectrical = MidspanDataAnalyzer.getLowestMidspanHeight(spanWires, 'electrical');
+      
+      // Update report data with formatted heights
+      reportData.lowestCommMidspanHeight = lowestComm.formattedHeight;
+      reportData.lowestCPSElectricalMidspanHeight = lowestElectrical.formattedHeight;
+      
+      // Process REF sub groups if present in the Katapult data
+      checkForREFSubGroups(reportData, katapultNode);
+    } else {
+      // Fall back to SPIDA extraction if Katapult not available
+      SpidaDataExtractor.extractMidspanHeights(reportData, measuredDesign);
+    }
     
     // Set midspanFromPole (part of Column J)
     reportData.midspanFromPole = reportData.poleNumber;
@@ -117,7 +135,92 @@ function extractPoleData(
     
     // Column K-O: Attacher-specific columns
     AttachmentAnalyzer.extractAttacherData(reportData, measuredDesign, recommendedDesign, katapultNode);
+    
+    // Get attacher description (list of all attachments from neutral down)
+    // Also collect their heights for the Excel report
+    reportData.attacherDescription = AttachmentAnalyzer.getAttacherDescription(
+      recommendedDesign,
+      measuredDesign,
+      katapultNode
+    );
+    
+    // Use AttachmentAnalyzer's cached attachments to get heights
+    const attachments = AttachmentAnalyzer._cachedAttachments;
+    if (attachments && attachments.length > 0) {
+      // Store attachment data as JSON for use in Excel generation
+      reportData.attachmentData = JSON.stringify(attachments);
+    }
   }
   
   return reportData;
+}
+
+/**
+ * Checks if a pole is part of a REF sub group and marks it accordingly
+ * 
+ * @param reportData - Report data to update
+ * @param katapultNode - Katapult node data
+ */
+function checkForREFSubGroups(
+  reportData: ReportData, 
+  katapultNode: Record<string, unknown> | null
+): void {
+  if (!katapultNode) return;
+  
+  // Check for connections in the node data
+  const connectionsData = getNestedValue<Record<string, Record<string, unknown>>>(
+    katapultNode,
+    ['connections'],
+    {}
+  );
+  
+  if (!connectionsData || Object.keys(connectionsData).length === 0) {
+    return;
+  }
+  
+  const connectedPoleIds: string[] = [];
+  let hasREFConnection = false;
+  
+  // Check each connection for REF status
+  Object.entries(connectionsData).forEach(([, connectionData]) => {
+    // Look for 'is_reference' or 'connection_type' = 'REF' attributes
+    const isReference = getNestedValue<boolean>(
+      connectionData,
+      ['attributes', 'is_reference', 'one'],
+      false
+    );
+    
+    const connectionType = getNestedValue<string>(
+      connectionData,
+      ['attributes', 'connection_type', 'one'],
+      ''
+    );
+    
+    // Check if this is a REF connection
+    const isREF = Boolean(isReference) || 
+                  (connectionType && connectionType.toLowerCase().includes('ref'));
+    
+    if (isREF) {
+      hasREFConnection = true;
+      
+      // Add connected pole IDs to the list
+      const fromPoleId = getNestedValue<string>(connectionData, ['node_id_1'], '');
+      const toPoleId = getNestedValue<string>(connectionData, ['node_id_2'], '');
+      
+      if (fromPoleId && !connectedPoleIds.includes(fromPoleId)) {
+        connectedPoleIds.push(fromPoleId);
+      }
+      
+      if (toPoleId && !connectedPoleIds.includes(toPoleId)) {
+        connectedPoleIds.push(toPoleId);
+      }
+    }
+  });
+  
+  // Update report data if this is a REF sub group
+  if (hasREFConnection) {
+    reportData.isREFSubGroup = true;
+    reportData.connectedPoleIds = connectedPoleIds;
+    reportData.refStatus = 'REF';
+  }
 }

@@ -79,14 +79,56 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
         };
       }
       
-      // Add attacher information
-      groups[key].attachers.push({
-        description: row.charterSpectrumDescription,
-        existingHeight: row.existingHeight,
-        proposedHeight: row.proposedHeight,
-        existingMidspan: row.existingMidspan,
-        proposedMidspan: row.proposedMidspan
-      });
+      // Check if we have attacher descriptions
+      if (row.attacherDescription) {
+        // Get the attacher lines and add each one separately
+        const attacherLines = row.attacherDescription.split('\n');
+        
+        // Try to get the cached attachment data from JSON
+        const attachmentData = row.attachmentData ? JSON.parse(row.attachmentData) : [];
+        
+        attacherLines.forEach((line, index) => {
+          let existingHeight = '';
+          let proposedHeight = '';
+          
+          // Check if this is a Charter/Spectrum attachment
+          const isCharter = line.toLowerCase().includes('charter');
+          
+          if (isCharter) {
+            // For Charter/Spectrum, only show in the proposed column, not existing
+            existingHeight = '';
+            proposedHeight = row.proposedHeight || '';
+          } else {
+            // For first entry, use the existing height
+            if (index === 0) {
+              existingHeight = row.existingHeight || '';
+              proposedHeight = (row.existingHeight !== row.proposedHeight && row.proposedHeight) 
+                ? row.proposedHeight 
+                : '';
+            } else if (attachmentData && attachmentData.length > index) {
+              // For other entries, get heights from cached data
+              existingHeight = attachmentData[index].heightStr || '';
+            }
+          }
+          
+          groups[key].attachers.push({
+            description: line,
+            existingHeight: existingHeight,
+            proposedHeight: proposedHeight,
+            existingMidspan: index === 0 ? row.existingMidspan : '',
+            proposedMidspan: index === 0 ? row.proposedMidspan : ''
+          });
+        });
+      } else {
+        // Fallback to old approach
+        groups[key].attachers.push({
+          description: row.charterSpectrumDescription,
+          existingHeight: row.attachmentAction === 'I' ? '' : row.existingHeight,
+          proposedHeight: row.proposedHeight,
+          existingMidspan: row.existingMidspan,
+          proposedMidspan: row.proposedMidspan
+        });
+      }
     });
     
     // Convert to array and sort by operation number
@@ -108,10 +150,10 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
           <li>Total poles processed: {summary.totalPoles}</li>
           <li>Full matches: {summary.matchedPoles}</li>
           <li>SPIDA-only poles: {summary.unmatchedSpidaPoles}</li>
-          <li>Katapult-only poles: {summary.katapultOnlyPoles}</li>
+          <li>Katapult-only poles: {summary.katapultOnlyPoles} (excluded from report)</li>
           <li>Total report rows: {summary.totalRows}</li>
         </ul>
-        <p>The report includes match status information for each pole.</p>
+        <p>The report includes match status information for each pole. Katapult-only poles are excluded as they don't exist in the SPIDAcalc file.</p>
       </div>
       
       <div id="resultsTableContainer" className="results-table-container">
@@ -120,29 +162,33 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({
             <thead>
               <tr>
                 <th rowSpan={3}>Operation Number</th>
-                <th rowSpan={3}>Attachment Action:<br/>(I)nstalling<br/>(R)emovong<br/>(E)xisting</th>
+                <th rowSpan={3}>Attachment Action:<br/>(I)nstalling<br/>(R)emoving<br/>(E)xisting</th>
                 <th rowSpan={3}>Pole Owner</th>
                 <th rowSpan={3}>Pole #</th>
                 <th rowSpan={3}>Pole Structure</th>
-                <th rowSpan={3}>Proposed Riser (Yes/No) &</th>
-                <th rowSpan={3}>Proposed Guy (Yes/No) &</th>
+                <th rowSpan={3}>Proposed Riser (Yes/No)</th>
+                <th rowSpan={3}>Proposed Guy (Yes/No)</th>
                 <th rowSpan={3}>PLA (%) with proposed attachment</th>
                 <th rowSpan={3}>Construction Grade of Analysis</th>
-                <th colSpan={3}>Existing Mid Span Data</th>
-                <th colSpan={5}>Make Ready Data</th>
-              </tr>
-              <tr>
-                <th rowSpan={2}>Height Lowest Com</th>
-                <th rowSpan={2}>Height Lowest CPS Electrical</th>
-                <th rowSpan={1}>From Pole / To Pole</th>
-                <th rowSpan={2}>Attacher Description</th>
-                <th rowSpan={2}>Existing</th>
-                <th rowSpan={2}>Proposed</th>
-                <th colSpan={2}>Mid Span<br/>(same span as existing)</th>
-              </tr>
-              <tr>
+                <th colSpan={2}>Existing Midspan Data</th>
                 <th></th>
+                <th colSpan={4}>Make Ready Data</th>
+              </tr>
+              <tr>
+                <th colSpan={1}></th>
+                <th colSpan={1}></th>
+                <th></th>
+                <th></th>
+                <th colSpan={2}>Attachment Height</th>
+                <th colSpan={1}>Midspan (same as existing)</th>
+              </tr>
+              <tr>
+                <th>Height Lowest Com</th>
+                <th>Height Lowest CPS Electrical</th>
+                <th>From Pole / To Pole</th>
+                <th>Attacher's Description</th>
                 <th>Existing</th>
+                <th>Proposed</th>
                 <th>Proposed</th>
               </tr>
             </thead>

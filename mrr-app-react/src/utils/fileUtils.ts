@@ -161,14 +161,70 @@ export function createExcelFile(reportData: ReportData[]): WorkBook {
       };
     }
     
-    // Add attacher information
-    groupedData[key].attachers.push({
-      description: row.charterSpectrumDescription,
-      existingHeight: row.existingHeight,
-      proposedHeight: row.proposedHeight,
-      existingMidspan: row.existingMidspan,
-      proposedMidspan: row.proposedMidspan
-    });
+    // If it's the first row for this pole and we have attacher descriptions
+    if (groupedData[key].attachers.length === 0) {
+      if (row.attacherDescription) {
+        // Get all the attacher descriptions without heights
+        const attacherLines = row.attacherDescription.split('\n');
+        
+        // Try to get the cached attachment data from JSON
+        const attachmentData = row.attachmentData ? JSON.parse(row.attachmentData) : [];
+        
+        // Match each attacher line with its cached data if available
+        attacherLines.forEach((line, index) => {
+          let existingHeight = '';
+          let proposedHeight = '';
+          
+          // If we have cached attachment data, get the heights
+          if (attachmentData && attachmentData.length > index) {
+            const attachment = attachmentData[index];
+            
+            // Check if this is a Charter/Spectrum attachment
+            const isCharter = line.toLowerCase().includes('charter');
+            
+            if (isCharter) {
+              // For Charter/Spectrum, only show in the proposed column, not existing
+              existingHeight = '';
+              proposedHeight = attachment.heightStr;
+            } else {
+              // For other companies, show in the existing column
+              existingHeight = attachment.heightStr;
+              
+              // For first entry (typically other Charter/Spectrum entries), check for moves
+              if (index === 0) {
+                // Include proposed height only if it's different from existing (indicating a move)
+                if (row.existingHeight && row.proposedHeight && row.existingHeight !== row.proposedHeight) {
+                  proposedHeight = row.proposedHeight;
+                }
+              }
+            }
+          } else {
+            // Fallback to original approach if no cached data
+            existingHeight = index === 0 ? row.existingHeight : '';
+            proposedHeight = (index === 0 && row.proposedHeight && row.existingHeight !== row.proposedHeight) 
+              ? row.proposedHeight 
+              : '';
+          }
+          
+          groupedData[key].attachers.push({
+            description: line,
+            existingHeight: existingHeight,
+            proposedHeight: proposedHeight,
+            existingMidspan: index === 0 ? row.existingMidspan : '',
+            proposedMidspan: index === 0 ? row.proposedMidspan : ''
+          });
+        });
+      } else {
+        // Fallback to charterSpectrumDescription if attacherDescription is not available
+        groupedData[key].attachers.push({
+          description: row.charterSpectrumDescription,
+          existingHeight: row.existingHeight,
+          proposedHeight: row.proposedHeight,
+          existingMidspan: row.existingMidspan,
+          proposedMidspan: row.proposedMidspan
+        });
+      }
+    }
   });
   
   // Convert to array and sort by operation number
@@ -186,23 +242,22 @@ export function createExcelFile(reportData: ReportData[]): WorkBook {
     'Pole Owner', 'Pole #', 'Pole Structure', 
     'Proposed Riser (Yes/No) &', 'Proposed Guy (Yes/No) &', 
     'PLA (%) with proposed attachment', 'Construction Grade of Analysis',
-    'Existing Mid Span Data', '', '',
-    'Make Ready Data', '', '', '', ''
+    'Existing Midspan Data', 'Existing Midspan Data', '',
+    'Make Ready Data', 'Make Ready Data', 'Make Ready Data', 'Make Ready Data', ''
   ]);
   
   // Row 2: Sub-headers
   excelData.push([
     '', '', '', '', '', '', '', '', '',
-    'Height Lowest Com', 'Height Lowest CPS Electrical', '',
-    'Attacher Description', 'Existing', 'Proposed', 
-    'Mid Span\n(same span as existing)', ''
+    '', '', '',
+    '', 'Attachment Height', 'Attachment Height', 'Midspan (same as existing)', ''
   ]);
   
   // Row 3: Sub-sub-headers
   excelData.push([
     '', '', '', '', '', '', '', '', '',
-    '', '', 'From Pole / To Pole',
-    '', '', '', 'Existing', 'Proposed'
+    'Height Lowest Com', 'Height Lowest CPS Electrical', 'From Pole / To Pole',
+    "Attacher's Description", 'Existing', 'Proposed', 'Existing', 'Proposed'
   ]);
   
   // Add data rows
@@ -301,7 +356,7 @@ export function createExcelFile(reportData: ReportData[]): WorkBook {
   
   // Define merged cell ranges for headers
   ws['!merges'] = [
-    // Row 1 merges
+    // Row 1 merges - columns A through I merged across all three rows
     { s: { r: 0, c: 0 }, e: { r: 2, c: 0 } }, // Operation Number
     { s: { r: 0, c: 1 }, e: { r: 2, c: 1 } }, // Attachment Action
     { s: { r: 0, c: 2 }, e: { r: 2, c: 2 } }, // Pole Owner
@@ -312,18 +367,13 @@ export function createExcelFile(reportData: ReportData[]): WorkBook {
     { s: { r: 0, c: 7 }, e: { r: 2, c: 7 } }, // PLA
     { s: { r: 0, c: 8 }, e: { r: 2, c: 8 } }, // Construction Grade
     
-    // Existing Mid Span Data group
-    { s: { r: 0, c: 9 }, e: { r: 0, c: 11 } }, // Existing Mid Span Data
-    { s: { r: 1, c: 9 }, e: { r: 2, c: 9 } }, // Height Lowest Com
-    { s: { r: 1, c: 10 }, e: { r: 2, c: 10 } }, // Height Lowest CPS Electrical
-    { s: { r: 1, c: 11 }, e: { r: 1, c: 11 } }, // From Pole / To Pole
+    // Existing Midspan Data group (columns J-K)
+    { s: { r: 0, c: 9 }, e: { r: 0, c: 10 } }, // "Existing Midspan Data" merged across J-K in row 1
     
-    // Make Ready Data group
-    { s: { r: 0, c: 12 }, e: { r: 0, c: 16 } }, // Make Ready Data
-    { s: { r: 1, c: 12 }, e: { r: 2, c: 12 } }, // Attacher Description
-    { s: { r: 1, c: 13 }, e: { r: 2, c: 13 } }, // Existing
-    { s: { r: 1, c: 14 }, e: { r: 2, c: 14 } }, // Proposed
-    { s: { r: 1, c: 15 }, e: { r: 1, c: 16 } }, // Mid Span
+    // Make Ready Data group (columns L-O)
+    { s: { r: 0, c: 12 }, e: { r: 0, c: 15 } }, // "Make Ready Data" merged across L-O in row 1
+    { s: { r: 1, c: 13 }, e: { r: 1, c: 14 } }, // "Attachment Height" merged across M-N in row 2
+    { s: { r: 1, c: 15 }, e: { r: 1, c: 16 } }, // "Midspan (same as existing)" merged across O-P in row 2
   ];
   
   // Create workbook

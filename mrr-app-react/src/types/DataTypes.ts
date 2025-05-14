@@ -315,15 +315,25 @@ export interface ReportData {
   poleNumber: string;
   poleStructure: string;
   proposedFeatures: string;
+  proposedRiser: string;  // Dedicated field for Column F: Proposed Riser (Yes/No)
   constructionGrade: string;
   lowestCommMidspanHeight: string;
   lowestCPSElectricalMidspanHeight: string;
   midspanFromPole: string;
   midspanToPole: string;
+  attacherDescription: string;
+  attachmentData?: string; // JSON string with attachment data for excel
   charterSpectrumDescription: string;
   existingHeight: string;
   proposedHeight: string;
   existingMidspan: string;
   proposedMidspan: string;
-  [key: string]: string | number | boolean;
+  
+  // REF sub group related fields
+  isREFSubGroup?: boolean;
+  connectedPoleIds?: string[];
+  refStatus?: string;
+  
+  // Index signature
+  [key: string]: string | number | boolean | string[] | undefined;
 }

@@ -13,7 +13,8 @@ import {
   getNestedValue, 
   convertMetersToFeet,
   formatHeight,
-  isCharterSpectrum
+  isCharterSpectrum,
+  getDefaultValue
 } from '../dataUtils';
 import type { CharterAttachment } from './types';
 import { KatapultDataExtractor } from './katapultDataExtractor';
@@ -66,29 +67,57 @@ export class SpidaDataExtractor {
   static extractPoleStructure(
     reportData: ReportData,
     measuredDesign: SpidaDesign,
-    spidaData: SpidaData
+    spidaData: SpidaData,
+    katapultNode: Record<string, unknown> | null
   ): void {
     // Get the pole client item ID reference
     const poleClientItem = getNestedValue<string>(measuredDesign, ['structure', 'pole', 'clientItem'], null);
     
-    if (!poleClientItem || !spidaData.clientData.poles) {
-      return;
-    }
-    
-    // Find the matching pole definition in clientData
-    const poleDefinition = spidaData.clientData.poles.find(pole => {
-      // Check aliases for a matching ID
-      return pole.aliases && pole.aliases.some(alias => alias.id === poleClientItem);
-    });
-    
-    if (poleDefinition) {
-      const species = poleDefinition.species || '';
-      const classOfPole = poleDefinition.classOfPole || '';
+    if (poleClientItem && spidaData.clientData.poles) {
+      // Find the matching pole definition in clientData
+      const poleDefinition = spidaData.clientData.poles.find(pole => {
+        // Check aliases for a matching ID
+        return pole.aliases && pole.aliases.some(alias => alias.id === poleClientItem);
+      });
       
-      if (species || classOfPole) {
-        reportData.poleStructure = `${species} ${classOfPole}`.trim();
+      if (poleDefinition) {
+        const species = poleDefinition.species || '';
+        const classOfPole = poleDefinition.classOfPole || '';
+        const height = poleDefinition.height?.value;
+        
+        if (species && classOfPole) {
+          // Convert height from meters to feet if available
+          let heightFeet = '';
+          if (height && typeof height === 'number') {
+            const heightInFeet = convertMetersToFeet(height);
+            if (heightInFeet !== null) {
+              heightFeet = Math.round(heightInFeet).toString();
+            }
+          }
+          
+          // Format as "height-class species" (e.g., "40-4 Southern Pine")
+          if (heightFeet) {
+            reportData.poleStructure = `${heightFeet}-${classOfPole} ${species}`;
+          } else {
+            // If height isn't available, just use class and species
+            reportData.poleStructure = `${classOfPole} ${species}`;
+          }
+          return;
+        }
       }
     }
+    
+    // Fall back to Katapult if available
+    if (katapultNode) {
+      const katapultPoleStructure = KatapultDataExtractor.getPoleStructure(katapultNode);
+      if (katapultPoleStructure) {
+        reportData.poleStructure = katapultPoleStructure;
+        return;
+      }
+    }
+    
+    // Set default if no data available
+    reportData.poleStructure = getDefaultValue('unknown');
   }
 
   /**
@@ -180,6 +209,9 @@ export class SpidaDataExtractor {
     const hasRiser = this.checkForRiser(recommendedDesign);
     features.push(`Riser: ${hasRiser ? 'YES' : 'NO'}`);
     
+    // Set the dedicated proposedRiser field
+    reportData.proposedRiser = hasRiser ? 'Yes' : 'No';
+    
     // Check for proposed guy
     const hasGuy = this.checkForGuy(recommendedDesign);
     features.push(`Guy: ${hasGuy ? 'YES' : 'NO'}`);
@@ -192,20 +224,106 @@ export class SpidaDataExtractor {
   }
 
   /**
-   * Checks for the presence of a riser in the design
+   * Checks for the presence of a Charter/Spectrum riser in the design
+   * 
+   * For SPIDAcalc, a riser is considered to be "added by Charter" if:
+   * 1. It appears in the Recommended Design (which contains proposed changes)
+   * 2. The equipment type is "RISER" (case-insensitive)
+   * 3. The owner is Charter/Spectrum (using flexible name matching)
    */
   static checkForRiser(design: SpidaDesign): boolean {
+    // Verify this is a Recommended Design layer - need BOTH conditions to match
+    // Based on the example provided in CPS_6457E_03_SPIDAcalc.json
+    if (design.layerType !== 'Recommended' || design.label !== 'Recommended Design') {
+      console.log('Warning: checkForRiser called on non-recommended design layer:', 
+                 design.layerType, design.label);
+      // Continue anyway in case the naming convention is different
+    }
+    
+    // Get equipments from the structure
     const equipment = getNestedValue<SpidaStructureEquipment[]>(design, ['structure', 'equipments'], null);
     
-    if (!equipment) {
+    if (!equipment || equipment.length === 0) {
       return false;
     }
     
-    // Check if any equipment is of type "RISER"
-    return equipment.some(equip => {
-      const equipmentType = getNestedValue<{ name?: string }>(equip, ['type'], null);
-      return equipmentType && equipmentType.name === 'RISER';
-    });
+    let foundCharterRiser = false;
+    
+    // Check each equipment item
+    for (const equip of equipment) {
+      // First, check if this is a riser - prioritize the direct path from the example
+      let isRiser = false;
+      
+      // Primary path: clientItem.type is a string "RISER"
+      const directType = getNestedValue<string>(equip, ['clientItem', 'type'], null);
+      if (directType && typeof directType === 'string' && 
+          directType.toUpperCase() === 'RISER') {
+        isRiser = true;
+      }
+      
+      // Backup paths if primary path doesn't match
+      if (!isRiser) {
+        // Try type.name
+        const typeName = getNestedValue<{ name?: string }>(equip, ['type'], null);
+        if (typeName && typeName.name && 
+            typeName.name.toUpperCase() === 'RISER') {
+          isRiser = true;
+        }
+        
+        // Try clientItem.type.name
+        const clientItemType = getNestedValue<{ name?: string }>(equip, ['clientItem', 'type'], null);
+        if (!isRiser && clientItemType && clientItemType.name && 
+            clientItemType.name.toUpperCase() === 'RISER') {
+          isRiser = true;
+        }
+        
+        // Try direct equip.type as string
+        if (!isRiser && equip.type && typeof equip.type === 'string' && 
+            equip.type.toUpperCase() === 'RISER') {
+          isRiser = true;
+        }
+        
+        // Check description or size fields as last resort
+        if (!isRiser) {
+          const description = getNestedValue<string>(equip, ['clientItem', 'description'], null);
+          const size = getNestedValue<string>(equip, ['clientItem', 'size'], null);
+          
+          if ((description && description.toUpperCase().includes('RISER')) ||
+              (size && size.toUpperCase().includes('RISER'))) {
+            isRiser = true;
+          }
+        }
+      }
+      
+      // If it's not a riser, continue to next equipment
+      if (!isRiser) {
+        continue;
+      }
+      
+      // Now check if it's owned by Charter
+      if (!equip.owner) {
+        continue;
+      }
+      
+      // Important: Check for owner.id = "Charter" as in example
+      if (typeof equip.owner === 'object') {
+        const ownerId = getNestedValue<string>(equip.owner, ['id'], null);
+        if (ownerId === 'Charter') {
+          console.log('Found SPIDA Charter riser with direct match on owner.id:', equip);
+          foundCharterRiser = true;
+          break;
+        }
+      }
+      
+      // If no direct match, use the flexible matching
+      if (isCharterSpectrum(equip.owner)) {
+        console.log('Found SPIDA Charter riser with flexible name matching:', equip);
+        foundCharterRiser = true;
+        break;
+      }
+    }
+    
+    return foundCharterRiser;
   }
 
   /**

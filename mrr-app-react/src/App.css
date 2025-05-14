@@ -316,6 +316,79 @@ button:disabled {
   margin-top: 20px;
 }
 
+/* Test Components styles */
+.test-components {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.test-container {
+  margin-top: 0;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+}
+
+.test-container h3 {
+  color: #2c3e50;
+  margin-bottom: 10px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #eee;
+}
+
+.test-container p {
+  margin-bottom: 15px;
+  color: #7f8c8d;
+}
+
+.test-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.test-button {
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.test-button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+
+.clear-button {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.test-results {
+  background-color: #f1f1f1;
+  padding: 10px;
+  border-radius: 4px;
+  overflow: auto;
+  max-height: 300px;
+}
+
+.test-results pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
 /* Mobile responsiveness */
 @media (max-width: 768px) {
   .container {

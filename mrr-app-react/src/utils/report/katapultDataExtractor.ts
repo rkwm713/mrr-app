@@ -33,7 +33,8 @@ export class KatapultDataExtractor {
     }
     
     // Fill in proposed features from Katapult attributes if available
-    reportData.proposedFeatures = this.getProposedFeatures(katapultNode);
+    // Pass the reportData so the individual feature fields (like proposedRiser) get set
+    reportData.proposedFeatures = this.getProposedFeatures(katapultNode, reportData);
     
     // Extract mid-span heights if available
     this.extractMidspanHeights(reportData, katapultNode);
@@ -75,14 +76,111 @@ export class KatapultDataExtractor {
   }
 
   /**
-   * Get proposed features string from Katapult attributes
+   * Get pole structure information (species & class)
    */
-  static getProposedFeatures(katapultNode: Record<string, unknown>): string {
+  static getPoleStructure(katapultNode: Record<string, unknown>): string | null {
+    // Get pole species from attributes
+    const species = getNestedValue<string>(katapultNode, ['attributes', 'pole_species', 'one'], null) ||
+                   getNestedValue<string>(katapultNode, ['attributes', 'pole_species', '-Imported'], null);
+    
+    // Get pole class from attributes
+    const poleClass = getNestedValue<string>(katapultNode, ['attributes', 'pole_class', 'one'], null) ||
+                     getNestedValue<string>(katapultNode, ['attributes', 'pole_class', '-Imported'], null);
+    
+    // Get pole height if available
+    const height = getNestedValue<string>(katapultNode, ['attributes', 'pole_height', 'one'], null) ||
+                  getNestedValue<string>(katapultNode, ['attributes', 'pole_height', '-Imported'], null);
+    
+    // Check birthmark_brand for additional data if not found in direct attributes
+    if (!species || !poleClass) {
+      // Get the birthmark_brand data which might contain pole specifications
+      const birthmarkBrand = getNestedValue<Record<string, Record<string, unknown>>>(
+        katapultNode, 
+        ['attributes', 'birthmark_brand'], 
+        null
+      );
+      
+      if (birthmarkBrand) {
+        // Get the first entry in the birthmark_brand object
+        const brandEntry = Object.values(birthmarkBrand)[0];
+        
+        // Extract species and class from birthmark_brand
+        const brandSpecies = getNestedValue<string>(brandEntry, ['pole_species'], null) ||
+                           getNestedValue<string>(brandEntry, ['pole_species*'], null);
+        
+        const brandClass = getNestedValue<string>(brandEntry, ['pole_class'], null);
+        const brandHeight = getNestedValue<string>(brandEntry, ['pole_height'], null);
+        
+        // Use birthmark data if direct attributes were not available
+        const finalSpecies = species || brandSpecies;
+        const finalClass = poleClass || brandClass;
+        const finalHeight = height || brandHeight;
+        
+        // Format and return if we have both species and class
+        if (finalSpecies && finalClass) {
+          // Convert abbreviations if needed (e.g., "SPC" to "Southern Pine")
+          const expandedSpecies = this.expandSpeciesAbbreviation(finalSpecies);
+          
+          // Format as "height-class species" (e.g., "40-4 Southern Pine")
+          if (finalHeight) {
+            return `${finalHeight}-${finalClass} ${expandedSpecies}`;
+          } else {
+            return `${finalClass} ${expandedSpecies}`;
+          }
+        }
+      }
+    } else if (species && poleClass) {
+      // If we already have direct attributes, format and return
+      const expandedSpecies = this.expandSpeciesAbbreviation(species);
+      
+      // Format as "height-class species" (e.g., "40-4 Southern Pine")
+      if (height) {
+        return `${height}-${poleClass} ${expandedSpecies}`;
+      } else {
+        return `${poleClass} ${expandedSpecies}`;
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Expands species abbreviation to full name
+   */
+  private static expandSpeciesAbbreviation(abbr: string): string {
+    const speciesMap: Record<string, string> = {
+      'SPC': 'Southern Pine',
+      'WRC': 'Western Red Cedar',
+      'DF': 'Douglas Fir',
+      'LP': 'Lodgepole Pine'
+    };
+    
+    // Check if it's a known abbreviation
+    const upperAbbr = abbr.toUpperCase();
+    if (upperAbbr in speciesMap) {
+      return speciesMap[upperAbbr];
+    }
+    
+    // If not a known abbreviation, return the original
+    return abbr;
+  }
+
+  /**
+   * Get proposed features string from Katapult attributes and set individual feature fields
+   */
+  static getProposedFeatures(katapultNode: Record<string, unknown>, reportData?: ReportData): string {
     const features: string[] = [];
     
-    // Check for proposed riser
+    // Check for proposed riser (general case for 'proposedFeatures' string)
     const hasRiser = getNestedValue<boolean>(katapultNode, ['attributes', 'riser', 'button_added'], false);
     features.push(`Riser: ${hasRiser ? 'YES' : 'NO'}`);
+    
+    // For the dedicated proposedRiser field, we need to check specifically for Charter/Spectrum risers
+    if (reportData) {
+      // Check equipment to see if there's a Charter/Spectrum riser
+      const hasCharterRiser = this.checkForCharterRiser(katapultNode);
+      reportData.proposedRiser = hasCharterRiser ? 'Yes' : 'No';
+    }
     
     // Check for proposed guy
     const hasGuy = getNestedValue<boolean>(katapultNode, ['attributes', 'down_guy', 'button_added'], false);
@@ -213,6 +311,209 @@ export class KatapultDataExtractor {
     if (lowestElectricalHeight !== null) {
       reportData.lowestCPSElectricalMidspanHeight = `${(lowestElectricalHeight as number).toFixed(1)}'`;
     }
+  }
+
+  /**
+   * Checks for Charter/Spectrum riser in Katapult data
+   * 
+   * For Katapult, a riser is considered to be "added by Charter" if any of these are true:
+   * 1. There's equipment with company_name/owner_name = Charter, equipment_type = Riser, and proposed = true
+   * 2. There's an equipment inventory item with company_name = Charter, make_ready_item_type = Riser, and action = Add
+   *    - Specifically using path nodes.[node_id].equipment.equipment_inventory.[inv_id].attachments.[att_id].attributes
+   * 3. There's a make-ready note containing text like "Charter: Add riser" or "Charter adding a riser"
+   */
+  static checkForCharterRiser(katapultNode: Record<string, unknown>): boolean {
+    // Method 1: Check direct equipment in attributes (higher level)
+    const directEquipment = getNestedValue<Record<string, Record<string, unknown>>>(
+      katapultNode, 
+      ['attributes', 'equipment'], 
+      null
+    );
+    
+    if (directEquipment) {
+      console.log('Checking direct equipment in attributes');
+      
+      const hasCharterRiserInEquipment = Object.values(directEquipment).some(equip => {
+        // Check that it's owned by Charter/Spectrum
+        const companyName = getNestedValue<string>(equip, ['company_name', 'one'], '') || 
+                           getNestedValue<string>(equip, ['owner_name', 'one'], '');
+        
+        if (!companyName) {
+          return false;
+        }
+        
+        // Log for debugging
+        console.log('Checking Katapult equipment company name:', companyName);
+        
+        if (!isCharterSpectrum(companyName)) {
+          return false;
+        }
+        
+        // Check if it's a riser - look for various possible field paths
+        const equipmentType = getNestedValue<string>(equip, ['equipment_type', 'button_added'], '') || 
+                             getNestedValue<string>(equip, ['equipment_type', 'one'], '') ||
+                             getNestedValue<string>(equip, ['make_ready_item_type', 'button_added'], '') ||
+                             getNestedValue<string>(equip, ['make_ready_item_type', 'one'], '') ||
+                             getNestedValue<string>(equip, ['description', 'one'], '');
+        
+        console.log('  Equipment type:', equipmentType);
+        
+        // Case-insensitive check for 'riser'
+        const isRiser = equipmentType ? equipmentType.toLowerCase().includes('riser') : false;
+        if (!isRiser) {
+          return false;
+        }
+        
+        // Check if it's proposed through various flags
+        const proposed = getNestedValue<boolean>(equip, ['proposed'], false);
+        const action = getNestedValue<string>(equip, ['action'], '');
+        // Case-insensitive check for 'add'
+        const isAdd = action ? action.toLowerCase() === 'add' : false;
+        
+        console.log('  Is proposed:', proposed, 'Action:', action);
+        
+        return proposed || isAdd;
+      });
+      
+      if (hasCharterRiserInEquipment) {
+        console.log('Found Charter riser in direct equipment attributes');
+        return true;
+      }
+    }
+    
+    // Method 2: Check equipment_inventory for explicit "Add" actions
+    // Path from example: nodes.[node_id].equipment.equipment_inventory.[inv_id].attachments.[att_id].attributes
+    const inventoryEquipment = getNestedValue<Record<string, Record<string, unknown>>>(
+      katapultNode, 
+      ['equipment', 'equipment_inventory'], 
+      null
+    );
+    
+    if (inventoryEquipment) {
+      console.log('Checking equipment inventory');
+      
+      for (const [invId, inventoryItem] of Object.entries(inventoryEquipment)) {
+        console.log(`Checking inventory item: ${invId}`);
+        
+        const attachments = getNestedValue<Record<string, Record<string, unknown>>>(
+          inventoryItem, 
+          ['attachments'], 
+          null
+        );
+        
+        if (!attachments) {
+          continue;
+        }
+        
+        for (const [attId, attachment] of Object.entries(attachments)) {
+          console.log(`Checking attachment: ${attId}`);
+          
+          const attributes = getNestedValue<Record<string, unknown>>(
+            attachment, 
+            ['attributes'], 
+            null
+          );
+          
+          if (!attributes) {
+            continue;
+          }
+          
+          // Check company name - EXACT field from example
+          const companyName = getNestedValue<string>(attributes, ['company_name'], '');
+          console.log(`Company name: ${companyName}`);
+          
+          if (!companyName || !isCharterSpectrum(companyName)) {
+            continue;
+          }
+          
+          // Check if it's a riser - EXACT fields from example
+          const makeReadyItemType = getNestedValue<string>(attributes, ['make_ready_item_type'], '');
+          const description = getNestedValue<string>(attributes, ['description'], '');
+          
+          // Log for debugging
+          console.log('Checking inventory attachment:', {
+            company: companyName,
+            type: makeReadyItemType,
+            description: description
+          });
+          
+          // Case-insensitive check for "riser"
+          const isRiser = (makeReadyItemType ? makeReadyItemType.toLowerCase() === 'riser' : false) || 
+                         (description ? description.toLowerCase() === 'riser' : false);
+          
+          if (!isRiser) {
+            continue;
+          }
+          
+          // Check action - EXACT field from example
+          const action = getNestedValue<string>(attributes, ['action'], '');
+          // Case-insensitive check for "Add"
+          if (action && action.toLowerCase() === 'add') {
+            console.log('Found Charter riser with "Add" action in equipment inventory attachment');
+            console.log('Attachment details:', attributes);
+            return true;
+          }
+        }
+      }
+    }
+    
+    // Method 3: Check make-ready notes for explicit mention of Charter adding a riser
+    console.log('Checking make-ready notes');
+    
+    const mrNoteFields = [
+      ['attributes', 'stress_MR_notes'],
+      ['attributes', 'kat_MR_notes'],
+      ['attributes', 'engineering_notes'],
+      ['attributes', 'notes']
+    ];
+    
+    for (const notePath of mrNoteFields) {
+      const notes = getNestedValue<Record<string, string>>(katapultNode, notePath, null);
+      if (!notes) {
+        continue;
+      }
+      
+      console.log(`Checking notes in ${notePath.join('.')}`);
+      
+      // Check each note VALUE for Charter adding a riser
+      for (const [noteKey, noteText] of Object.entries(notes)) {
+        if (!noteText || typeof noteText !== 'string') {
+          continue;
+        }
+        
+        console.log(`Checking note: ${noteKey.substring(0, 15)}...`);
+        
+        // Convert to lowercase for case-insensitive matching
+        const lowerNote = noteText.toLowerCase();
+        
+        // Look for various patterns of Charter adding a riser
+        const hasCharterMention = lowerNote.includes('charter') || lowerNote.includes('spectrum');
+        
+        if (!hasCharterMention) {
+          continue;
+        }
+        
+        const addRiserPatterns = [
+          'add riser',
+          'adding riser',
+          'add a riser',
+          'adding a riser',
+          'install riser',
+          'installing riser',
+          'new riser'
+        ];
+        
+        for (const pattern of addRiserPatterns) {
+          if (lowerNote.includes(pattern)) {
+            console.log(`Found Charter riser in make-ready note with pattern '${pattern}'`);
+            console.log('Note text:', noteText);
+            return true;
+          }
+        }
+      }
+    }
+    
+    return false;
   }
 
   /**

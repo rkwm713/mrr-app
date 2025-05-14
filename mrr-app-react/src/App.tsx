@@ -4,10 +4,13 @@ import './App.css';
 import FileUpload from './components/FileUpload';
 import ProcessingStatus from './components/ProcessingStatus';
 import ResultsDisplay from './components/ResultsDisplay';
+import TestRiserDetection from './components/TestRiserDetection';
+import TestCorrelation from './components/TestCorrelation';
 import { readJSONFile, validateSpidaFile, validateKatapultFile, createExcelFile, downloadExcelFile } from './utils/fileUtils';
 import type { SpidaData, KatapultData, ReportData, CorrelationResult } from './types/DataTypes';
-import { correlatePoles } from './utils/correlationUtils';
 import { generateReport } from './utils/report/reportGenerator';
+import { EnhancedPoleCorrelator } from './utils/correlationUtils';
+
 
 function App() {
   // Application state
@@ -123,8 +126,8 @@ function App() {
         progressPercent: 40
       }));
 
-      // Use the actual correlation implementation
-      const correlationResult: CorrelationResult = correlatePoles(spidaData, katapultData);
+      // Use the EnhancedPoleCorrelator for more sophisticated pole matching
+      const correlationResult: CorrelationResult = EnhancedPoleCorrelator.correlatePoles(spidaData, katapultData);
 
       // Update progress
       setAppState(prev => ({
@@ -263,6 +266,19 @@ function App() {
           onDownload={handleDownload}
           isDownloadEnabled={appState.processingComplete && Boolean(workbook)}
         />
+        
+        {/* Test Components */}
+        <div className="test-components">
+          <TestRiserDetection 
+            spidaData={fileState.spidaData}
+            katapultData={fileState.katapultData}
+            isVisible={!appState.isProcessing && Boolean(fileState.spidaData) && Boolean(fileState.katapultData)}
+          />
+          
+          <TestCorrelation
+            isVisible={!appState.isProcessing}
+          />
+        </div>
         
         {/* Reset Button */}
         {(appState.processingComplete || appState.statusMessage.includes('Error')) && (

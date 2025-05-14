@@ -68,6 +68,13 @@ Please mark each task as completed by placing an [X] in the checkbox or noting D
     - [X]  Create logic to extract pole identifiers from both data sources
     - [X]  Build matching algorithm
     - [X]  Handle unmatched poles
+- [X]  **Step 3.2:** Enhanced Pole Correlation
+    - [X]  Implement EnhancedPoleCorrelator class with confidence scoring (0-1)
+    - [X]  Create multi-stage matching algorithm: Exact → Normalized → Partial → Geographic
+    - [X]  Add support for extracting and matching alternative pole identifiers
+    - [X]  Implement string similarity matching for partial matches
+    - [X]  Add geographic proximity matching with distance-based confidence
+    - [X]  Integrate enhanced correlation with existing app
 
 ---
 
@@ -171,6 +178,9 @@ The implementation has been completed with the following enhancements:
    - "To Pole" identification in spans would require enhanced connectivity analysis between poles
    - Dynamic filtering of report data could be added to focus on specific pole types or attachment actions
    - Performance optimization for very large datasets could be implemented if needed
+   - User-configurable confidence thresholds for pole matching
+   - Visual indicators of match confidence in the UI
+   - Ability to manually review and correct low-confidence matches
 
 ---
 

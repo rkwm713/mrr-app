@@ -20,16 +20,23 @@ export class ReportDataFactory {
       poleNumber: getDefaultValue('unknown'),
       poleStructure: getDefaultValue('unknown'),
       proposedFeatures: '',
+      proposedRiser: 'No',  // Initialize to "No" by default
       constructionGrade: getDefaultValue('unknown'),
       lowestCommMidspanHeight: getDefaultValue('unknown'),
       lowestCPSElectricalMidspanHeight: getDefaultValue('unknown'),
       midspanFromPole: getDefaultValue('unknown'),
       midspanToPole: getDefaultValue('unknown'),
+      attacherDescription: getDefaultValue('unknown'),
       charterSpectrumDescription: getDefaultValue('unknown'),
       existingHeight: getDefaultValue('not-applicable'),
       proposedHeight: getDefaultValue('not-applicable'),
       existingMidspan: getDefaultValue('not-applicable'),
-      proposedMidspan: getDefaultValue('not-applicable')
+      proposedMidspan: getDefaultValue('not-applicable'),
+      
+      // Additional fields for REF sub groups
+      isREFSubGroup: false,
+      connectedPoleIds: [] as string[],
+      refStatus: ''
     };
   }
 }
