@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Make-Ready Report Generator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .description {
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .file-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .file-input {
+            flex: 0 0 48%;
+            margin-bottom: 15px;
+        }
+        .file-input label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        .file-input input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: #f8fafc;
+        }
+        .upload-area.dragover {
+            background-color: #e1f0fa;
+        }
+        .buttons {
+            text-align: center;
+            margin-top: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .file-info {
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #e8f4f8;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Make-Ready Report Generator</h1>
+        <p class="description">Upload SPIDAcalc and Katapult JSON files to generate a Make-Ready Report</p>
+        
+        <div class="upload-area" id="drop-area">
+            <p>Drag and drop files here</p>
+            <p>or</p>
+            <div class="file-inputs">
+                <div class="file-input">
+                    <label for="spida-file">SPIDAcalc JSON File:</label>
+                    <input type="file" id="spida-file" accept=".json">
+                </div>
+                <div class="file-input">
+                    <label for="katapult-file">Katapult JSON File:</label>
+                    <input type="file" id="katapult-file" accept=".json">
+                </div>
+            </div>
+        </div>
+        
+        <div id="file-status"></div>
+        
+        <div class="buttons">
+            <button id="generate-button" disabled>Generate Report</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+    // Application logic
+    document.addEventListener('DOMContentLoaded', function() {
+        // DOM elements
+        const dropArea = document.getElementById('drop-area');
+        const spidaFileInput = document.getElementById('spida-file');
+        const katapultFileInput = document.getElementById('katapult-file');
+        const generateButton = document.getElementById('generate-button');
+        const fileStatusElem = document.getElementById('file-status');
+        const statusElem = document.getElementById('status');
+        
+        // File storage
+        let spidaData = null;
+        let katapultData = null;
+        
+        // Drag and drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('dragover');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('dragover');
+        }
+        
+        // Handle dropped files
+        dropArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            handleFiles(files);
+        }
+        
+        function handleFiles(files) {
+            for(const file of files) {
+                if (file.name.toLowerCase().includes('spida')) {
+                    spidaFileInput.files = new DataTransfer().files;
+                    handleSpidaFile(file);
+                } else if (file.name.toLowerCase().includes('katapult')) {
+                    katapultFileInput.files = new DataTransfer().files;
+                    handleKatapultFile(file);
+                } else {
+                    // Try to determine based on content
+                    readFileContent(file).then(content => {
+                        try {
+                            const jsonData = JSON.parse(content);
+                            if (isSpidaCalcFile(jsonData)) {
+                                handleSpidaFile(file);
+                            } else if (isKatapultFile(jsonData)) {
+                                handleKatapultFile(file);
+                            } else {
+                                showStatus('Unknown JSON file type', 'error');
+                            }
+                        } catch (e) {
+                            showStatus('Invalid JSON file', 'error');
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Handle file inputs
+        spidaFileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleSpidaFile(this.files[0]);
+            }
+        });
+        
+        katapultFileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleKatapultFile(this.files[0]);
+            }
+        });
+        
+        function handleSpidaFile(file) {
+            readFileContent(file).then(content => {
+                try {
+                    spidaData = JSON.parse(content);
+                    if (!isSpidaCalcFile(spidaData)) {
+                        showStatus('Not a valid SPIDAcalc file', 'error');
+                        spidaData = null;
+                    } else {
+                        showFileInfo('SPIDAcalc', file, spidaData);
+                        updateGenerateButton();
+                    }
+                } catch (e) {
+                    showStatus('Error parsing SPIDAcalc file: ' + e.message, 'error');
+                }
+            });
+        }
+        
+        function handleKatapultFile(file) {
+            readFileContent(file).then(content => {
+                try {
+                    katapultData = JSON.parse(content);
+                    if (!isKatapultFile(katapultData)) {
+                        showStatus('Not a valid Katapult file', 'error');
+                        katapultData = null;
+                    } else {
+                        showFileInfo('Katapult', file, katapultData);
+                        updateGenerateButton();
+                    }
+                } catch (e) {
+                    showStatus('Error parsing Katapult file: ' + e.message, 'error');
+                }
+            });
+        }
+        
+        function readFileContent(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    resolve(event.target.result);
+                };
+                reader.onerror = function(error) {
+                    reject(error);
+                };
+                reader.readAsText(file);
+            });
+        }
+        
+        // Determine file types
+        function isSpidaCalcFile(data) {
+            return Boolean(
+                data.schema && data.schema.includes("/schema/spidacalc/") ||
+                data.clientData && data.leads
+            );
+        }
+        
+        function isKatapultFile(data) {
+            return Boolean(
+                data.nodes && data.traces ||
+                data.job_creator && data.traces
+            );
+        }
+        
+        // Update UI
+        function showFileInfo(type, file, data) {
+            const infoElem = document.createElement('div');
+            infoElem.className = 'file-info';
+            
+            let info = `<strong>${type} File Loaded:</strong> ${file.name} (${formatFileSize(file.size)})`;
+            
+            if (type === 'SPIDAcalc') {
+                const poleCount = countPoles(data);
+                info += `<br>Poles found: ${poleCount}`;
+            } else if (type === 'Katapult') {
+                const nodeCount = countNodes(data);
+                info += `<br>Nodes found: ${nodeCount}`;
+            }
+            
+            infoElem.innerHTML = info;
+            
+            // Remove previous info of this type
+            const existingInfos = fileStatusElem.querySelectorAll('.file-info');
+            existingInfos.forEach(elem => {
+                if (elem.innerHTML.includes(type)) {
+                    elem.remove();
+                }
+            });
+            
+            fileStatusElem.appendChild(infoElem);
+            
+            showStatus(`${type} file loaded successfully`, 'success');
+        }
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function countPoles(spidaData) {
+            let count = 0;
+            if (spidaData && spidaData.leads) {
+                for (const lead of spidaData.leads) {
+                    if (lead.locations) {
+                        count += lead.locations.length;
+                    }
+                }
+            }
+            return count;
+        }
+        
+        function countNodes(katapultData) {
+            if (katapultData && katapultData.nodes) {
+                return Object.keys(katapultData.nodes).length;
+            }
+            return 0;
+        }
+        
+        function showStatus(message, type = '') {
+            statusElem.textContent = message;
+            statusElem.className = 'status ' + type;
+        }
+        
+        function updateGenerateButton() {
+            generateButton.disabled = !(spidaData || katapultData);
+        }
+        
+        // Generate report
+        generateButton.addEventListener('click', function() {
+            if (!spidaData && !katapultData) {
+                showStatus('Please upload at least one file', 'error');
+                return;
+            }
+            
+            showStatus('Processing data, please wait...', '');
+            
+            // Simulate processing
+            setTimeout(() => {
+                try {
+                    if (spidaData && katapultData) {
+                        processCorrelatedData();
+                    } else if (spidaData) {
+                        processSpidaOnly();
+                    } else if (katapultData) {
+                        processKatapultOnly();
+                    }
+                } catch (error) {
+                    showStatus('Error generating report: ' + error.message, 'error');
+                }
+            }, 1000);
+        });
+        
+        function processCorrelatedData() {
+            // In a real implementation, this would:
+            // 1. Correlate poles between SPIDAcalc and Katapult
+            // 2. Extract data for each column
+            // 3. Generate Excel file
+            // 4. Trigger download
+            
+            const spidaLocationsCount = countPoles(spidaData);
+            const katapultNodesCount = countNodes(katapultData);
+            
+            // Simulate report generation
+            showStatus(`Report generated successfully with data from both sources. Processed ${spidaLocationsCount} SPIDAcalc poles and ${katapultNodesCount} Katapult nodes.`, 'success');
+            
+            // Simulate download
+            simulateDownload('make_ready_report.xlsx');
+        }
+        
+        function processSpidaOnly() {
+            const poleCount = countPoles(spidaData);
+            showStatus(`Report generated with SPIDAcalc data only. Processed ${poleCount} poles.`, 'success');
+            simulateDownload('make_ready_report_spida_only.xlsx');
+        }
+        
+        function processKatapultOnly() {
+            const nodeCount = countNodes(katapultData);
+            showStatus(`Report generated with Katapult data only. Processed ${nodeCount} nodes.`, 'success');
+            simulateDownload('make_ready_report_katapult_only.xlsx');
+        }
+        
+        function simulateDownload(filename) {
+            const downloadLink = document.createElement('a');
+            downloadLink.textContent = `Download ${filename}`;
+            downloadLink.style.display = 'block';
+            downloadLink.style.marginTop = '15px';
+            downloadLink.style.textAlign = 'center';
+            downloadLink.href = '#';
+            downloadLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                alert('In a real implementation, this would download the Excel file. The SheetJS library would be used to generate the actual XLSX file.');
+            });
+            
+            statusElem.appendChild(downloadLink);
+        }
+    });
+    </script>
+</body>
+</html>
